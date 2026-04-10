@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import ConnectionTest from '../components/common/ConnectionTest';
 
 const Home = () => {
   return (
@@ -17,7 +18,10 @@ const Home = () => {
           </Link>
         </div>
       </div>
-
+      {/* Add the connection test */}
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem' }}>
+        <ConnectionTest />
+      </div>
       {/* Features Section (Optional) */}
       <div style={featuresStyle}>
         <h2>Why Choose {/* Platform Name */}?</h2>
