@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const Login = () => {
-  const { login } = useAuth(); // Get login function from context
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { login } = useAuth();
 
   // UI states
   const [errors, setErrors] = useState({});
@@ -82,9 +85,11 @@ const handleSubmit = async (e) => {
     const data = await response.json();
 
     if (response.ok) {
-      login(data.user, data.token); // Use context function
-      navigate('/dashboard');
-
+      login(data.user, data.token);
+      
+      // Redirect to intended page or dashboard
+      const from = location.state?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
     } else {
       // Login failed
       setApiError(data.message || 'Login failed. Please try again.');
