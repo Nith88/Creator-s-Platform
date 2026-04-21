@@ -1,57 +1,60 @@
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const Header = () => {
+  const { user, logout, isAuthenticated } = useAuth();
+
   return (
     <header style={headerStyle}>
       <div style={containerStyle}>
-        {/* Logo/Brand Name */}
         <h1 style={logoStyle}>
           <Link to="/" style={linkStyle}>
-            {/* YOUR PLATFORM NAME HERE */}
+            Your Platform Name
           </Link>
         </h1>
 
-        {/* Navigation Links */}
-        <nav>
+        <nav style={navStyle}>
           <Link to="/" style={navLinkStyle}>Home</Link>
-          <Link to="/login" style={navLinkStyle}>Login</Link>
-          <Link to="/register" style={navLinkStyle}>Register</Link>
+          
+          {isAuthenticated() ? (
+            <>
+              <Link to="/dashboard" style={navLinkStyle}>Dashboard</Link>
+              <span style={userNameStyle}>Hi, {user.name}</span>
+              <button onClick={logout} style={logoutBtnStyle}>
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" style={navLinkStyle}>Login</Link>
+              <Link to="/register" style={navLinkStyle}>Register</Link>
+            </>
+          )}
         </nav>
       </div>
     </header>
   );
 };
 
-// Basic inline styles (you can move these to CSS later)
-const headerStyle = {
-  backgroundColor: '#333',
-  color: 'white',
-  padding: '1rem 0',
-};
-
-const containerStyle = {
-  maxWidth: '1200px',
-  margin: '0 auto',
-  padding: '0 2rem',
+// Add these styles
+const navStyle = {
   display: 'flex',
-  justifyContent: 'space-between',
   alignItems: 'center',
+  gap: '1.5rem',
 };
 
-const logoStyle = {
-  margin: 0,
-  fontSize: '1.5rem',
-};
-
-const linkStyle = {
+const userNameStyle = {
   color: 'white',
-  textDecoration: 'none',
+  fontSize: '0.9rem',
 };
 
-const navLinkStyle = {
+const logoutBtnStyle = {
+  padding: '0.5rem 1rem',
+  backgroundColor: '#dc3545',
   color: 'white',
-  textDecoration: 'none',
-  marginLeft: '2rem',
+  border: 'none',
+  borderRadius: '5px',
+  cursor: 'pointer',
 };
 
 export default Header;
