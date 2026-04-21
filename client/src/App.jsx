@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext'; // Import the AuthProvider
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import Home from './pages/Home';
@@ -9,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 function App() {
   return (
     <BrowserRouter>
+      <AuthProvider>
       <div style={appStyle}>
         {/* Header appears on all pages */}
         <Header />
@@ -30,6 +32,7 @@ function App() {
         {/* Footer appears on all pages */}
         <Footer />
       </div>
+      </AuthProvider>
     </BrowserRouter>
   );
 }
