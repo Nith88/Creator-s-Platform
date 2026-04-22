@@ -37,6 +37,13 @@ const Header = () => {
 };
 
 // Add these styles
+
+const headerStyle = { backgroundColor: '#333', padding: '1rem' };
+const containerStyle = { maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
+const logoStyle = { color: 'white', textDecoration: 'none' };
+const linkStyle = { color: 'white', textDecoration: 'none' };
+const navLinkStyle = { color: 'white', textDecoration: 'none', marginRight: '1rem' };
+
 const navStyle = {
   display: 'flex',
   alignItems: 'center',
