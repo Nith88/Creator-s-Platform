@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import api from '../services/api';
+
 
 const Login = () => {
   const location = useLocation();
@@ -13,7 +15,12 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  const navigate = useNavigate();
+  
+const [formData, setFormData] = useState({
+  email: '',
+  password: ''
+});
+
 
   // Handlers will go here
 const handleChange = (e) => {
@@ -58,46 +65,32 @@ const validateForm = () => {
 };
 const handleSubmit = async (e) => {
   e.preventDefault();
-  
-  // Clear previous error
   setApiError('');
 
-  // Validate form
-  if (!validateForm()) {
-    return;
-  }
+  if (!validateForm()) return;
 
   setIsLoading(true);
 
   try {
-    // Send login request
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password
-      })
+    const response = await api.post('/api/auth/login', {
+      email: formData.email.trim().toLowerCase(),
+      password: formData.password
     });
 
-    const data = await response.json();
+    const data = response.data;
 
-    if (response.ok) {
-      login(data.user, data.token);
-      
-      // Redirect to intended page or dashboard
-      const from = location.state?.from?.pathname || '/dashboard';
-      navigate(from, { replace: true });
-    } else {
-      // Login failed
-      setApiError(data.message || 'Login failed. Please try again.');
-    }
+    login(data.user, data.token);
+
+    const from = location.state?.from?.pathname || '/dashboard';
+    navigate(from, { replace: true });
 
   } catch (error) {
     console.error('Login error:', error);
-    setApiError('Unable to connect to server. Please try again.');
+
+    setApiError(
+      error.response?.data?.message ||
+      'Login failed. Please try again.'
+    );
   } finally {
     setIsLoading(false);
   }

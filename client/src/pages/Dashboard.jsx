@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Dashboard = () => {
   const { user, logout, loading } = useAuth();
+  const navigate = useNavigate();
 
   if (loading) {
     return <div>Loading...</div>;
@@ -12,7 +13,10 @@ const Dashboard = () => {
   if (!user) {
     return <Navigate to="/login" />;
   }
-
+const handleLogout = () => {
+  logout();           // clears auth (from context)
+  navigate('/login'); // redirect after logout
+};
   return (
     <div style={containerStyle}>
       <div style={headerStyle}>
