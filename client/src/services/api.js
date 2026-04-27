@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
 // Create axios instance with base configuration
 const api = axios.create({
@@ -9,8 +10,7 @@ const api = axios.create({
   },
 });
 
-// Request interceptor will go here
-// Request interceptor
+// Request interceptor - Add token to every request
 api.interceptors.request.use(
   (config) => {
     // Get token from localStorage
@@ -26,11 +26,12 @@ api.interceptors.request.use(
   },
   (error) => {
     // Handle request error
+    toast.error('Request failed. Please try again.');
     return Promise.reject(error);
   }
 );
-// Response interceptor will go here
-// Response interceptor
+
+// Response interceptor - Handle errors and 401 responses
 api.interceptors.response.use(
   (response) => {
     // If response is successful, just return it
@@ -38,23 +39,56 @@ api.interceptors.response.use(
   },
   (error) => {
     // Handle error responses
-    
-    // Check if error is 401 Unauthorized
-    if (error.response && error.response.status === 401) {
-      // Token is invalid or expired
-      
-      // Clear localStorage
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      
-      // Redirect to login
-      window.location.href = '/login';
-      
-      // Show message (optional)
-      console.log('Session expired. Please login again.');
+    let errorMessage = 'An error occurred. Please try again.';
+
+    if (error.response) {
+      // Server responded with error status
+      const { status, data } = error.response;
+
+      // Extract error message from response
+      errorMessage = data?.message || data?.error || errorMessage;
+
+      // Handle specific status codes
+      if (status === 400) {
+        toast.error(`Validation Error: ${errorMessage}`);
+      } else if (status === 401) {
+        // Token is invalid or expired
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        toast.error('Session expired. Please login again.');
+        
+        // Redirect to login page
+        window.location.href = '/login';
+      } else if (status === 403) {
+        toast.error('You do not have permission to perform this action.');
+      } else if (status === 404) {
+        toast.error(`Not Found: ${errorMessage}`);
+      } else if (status === 500) {
+        toast.error('Server error. Please try again later.');
+      } else {
+        toast.error(errorMessage);
+      }
+    } else if (error.request) {
+      // Request made but no response received
+      errorMessage = 'No response from server. Please check your connection.';
+      toast.error(errorMessage);
+    } else {
+      // Error in request setup
+      errorMessage = error.message || 'Request setup error';
+      toast.error(errorMessage);
     }
-    
-    // Return the error for component to handle
+
+    // Log error details for debugging
+    console.error('API Error:', {
+      message: errorMessage,
+      status: error.response?.status,
+      data: error.response?.data,
+      request: error.request ? 'No response received' : 'No request made',
+      error: error.message,
+    });
+
+    // Return the error for component to handle if needed
     return Promise.reject(error);
   }
 );
