@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import socket from '../services/socket';
 
 const Dashboard = () => {
   const { user, logout, loading } = useAuth();
@@ -14,6 +15,56 @@ const Dashboard = () => {
   const [error, setError] = useState('');
   const [hoveredId, setHoveredId] = useState(null);
 
+  /* ========================= */
+  /* 🔌 SOCKET CONNECTION */
+  /* ========================= */
+  useEffect(() => {
+    if (!user) return;
+
+    socket.connect();
+
+    socket.on('connect', () => {
+      console.log('🔌 Socket connected:', socket.id);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('❌ Socket disconnected:', reason);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error.message);
+    });
+
+    /* ✅ REAL-TIME EVENTS */
+
+    // When a post is deleted (from any user)
+    socket.on('post_deleted', (postId) => {
+      setPosts((prev) => prev.filter((post) => post._id !== postId));
+
+      setPagination((prev) => ({
+        ...prev,
+        total: prev.total - 1,
+      }));
+    });
+
+    // When a new post is created
+    socket.on('post_created', (newPost) => {
+      setPosts((prev) => [newPost, ...prev]);
+    });
+
+    return () => {
+      socket.off('connect');
+      socket.off('disconnect');
+      socket.off('connect_error');
+      socket.off('post_deleted');
+      socket.off('post_created');
+      socket.disconnect();
+    };
+  }, [user]);
+
+  /* ========================= */
+  /* 📡 FETCH POSTS */
+  /* ========================= */
   useEffect(() => {
     fetchPosts(currentPage);
   }, [currentPage]);
@@ -39,6 +90,7 @@ const Dashboard = () => {
   };
 
   const handleLogout = () => {
+    socket.disconnect(); // ✅ ensure socket closes on logout
     logout();
     navigate('/login');
   };
@@ -54,12 +106,16 @@ const Dashboard = () => {
       const response = await api.delete(`/api/posts/${postId}`);
 
       if (response.data.success) {
+        // Local update (instant UI)
         setPosts(posts.filter((post) => post._id !== postId));
 
         setPagination((prev) => ({
           ...prev,
           total: prev.total - 1,
         }));
+
+        // Emit event to others
+        socket.emit('delete_post', postId);
 
         alert('Post deleted successfully');
       }
@@ -74,7 +130,6 @@ const Dashboard = () => {
 
   return (
     <div style={containerStyle}>
-      {/* Header */}
       <div style={headerStyle}>
         <h2>Welcome, {user.name} 👋</h2>
 
@@ -89,10 +144,8 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Error */}
       {error && <div style={errorStyle}>{error}</div>}
 
-      {/* Loading */}
       {isLoading ? (
         <div style={centerStyle}>Loading posts...</div>
       ) : (
@@ -129,7 +182,6 @@ const Dashboard = () => {
                     </span>
                   </div>
 
-                  {/* ✅ Actions (Edit + Delete) */}
                   <div style={actionsStyle}>
                     <Link to={`/edit/${post._id}`}>
                       <button style={editButtonStyle}>Edit</button>
@@ -145,7 +197,6 @@ const Dashboard = () => {
                 </div>
               ))}
 
-              {/* Pagination */}
               <div style={paginationStyle}>
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
@@ -181,141 +232,174 @@ const Dashboard = () => {
     </div>
   );
 };
-
-export default Dashboard;
-
 /* ========================= */
-/* 🎨 CSS-IN-JS STYLES */
+/* 🌐 CONTAINER */
 /* ========================= */
-
-const containerStyle = {
+export const containerStyle = {
   minHeight: '100vh',
   padding: '2rem',
   maxWidth: '1100px',
   margin: '0 auto',
-  backgroundColor: '#f4f6f8',
+  background: 'linear-gradient(to right, #eef2f3, #ffffff)',
+  fontFamily: 'Segoe UI, sans-serif',
 };
 
-const headerStyle = {
+/* ========================= */
+/* 🔝 HEADER */
+/* ========================= */
+export const headerStyle = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
   marginBottom: '2rem',
-  padding: '1rem 1.5rem',
-  backgroundColor: 'white',
-  borderRadius: '10px',
-  boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+  padding: '1.2rem 1.5rem',
+  backgroundColor: '#ffffff',
+  borderRadius: '12px',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
 };
 
-const createButtonStyle = {
-  padding: '0.5rem 1rem',
+/* ========================= */
+/* 🔘 BUTTONS */
+/* ========================= */
+export const createButtonStyle = {
+  padding: '0.5rem 1.2rem',
   backgroundColor: '#28a745',
+  color: 'white',
+  border: 'none',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  fontWeight: '500',
+  transition: '0.2s',
+};
+
+export const logoutButtonStyle = {
+  padding: '0.5rem 1.2rem',
+  backgroundColor: '#dc3545',
+  color: 'white',
+  border: 'none',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  fontWeight: '500',
+  transition: '0.2s',
+};
+
+export const editButtonStyle = {
+  padding: '0.4rem 1rem',
+  backgroundColor: '#007bff',
   color: 'white',
   border: 'none',
   borderRadius: '5px',
   cursor: 'pointer',
+  fontSize: '0.85rem',
 };
 
-const logoutButtonStyle = {
-  padding: '0.5rem 1rem',
+export const deleteButtonStyle = {
+  padding: '0.4rem 1rem',
   backgroundColor: '#dc3545',
   color: 'white',
   border: 'none',
   borderRadius: '5px',
   cursor: 'pointer',
+  fontSize: '0.85rem',
 };
 
-const postsContainerStyle = {
+/* ========================= */
+/* 📦 POSTS */
+/* ========================= */
+export const postsContainerStyle = {
   display: 'flex',
   flexDirection: 'column',
+  gap: '1rem',
 };
 
-const postCardStyle = {
+export const postCardStyle = {
   padding: '1.5rem',
-  backgroundColor: 'white',
-  borderRadius: '10px',
-  marginBottom: '1rem',
-  boxShadow: '0 4px 8px rgba(0,0,0,0.08)',
-  transition: 'all 0.2s ease',
+  backgroundColor: '#ffffff',
+  borderRadius: '12px',
+  boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
+  transition: 'all 0.25s ease',
+  border: '1px solid #f1f1f1',
 };
 
-const contentPreviewStyle = {
+/* ========================= */
+/* 📝 TEXT */
+/* ========================= */
+export const contentPreviewStyle = {
   color: '#555',
   margin: '1rem 0',
+  lineHeight: '1.5',
 };
 
-const metaStyle = {
+export const metaStyle = {
   display: 'flex',
   gap: '1rem',
   fontSize: '0.8rem',
   color: '#888',
+  flexWrap: 'wrap',
 };
 
-const actionsStyle = {
+/* ========================= */
+/* ⚙️ ACTIONS */
+/* ========================= */
+export const actionsStyle = {
   marginTop: '1rem',
   display: 'flex',
   gap: '10px',
   justifyContent: 'flex-end',
 };
 
-const editButtonStyle = {
-  padding: '0.5rem 1rem',
-  backgroundColor: '#007bff',
-  color: 'white',
-  border: 'none',
-  borderRadius: '5px',
-  cursor: 'pointer',
-};
-
-const deleteButtonStyle = {
-  padding: '0.5rem 1rem',
-  backgroundColor: '#dc3545',
-  color: 'white',
-  border: 'none',
-  borderRadius: '5px',
-  cursor: 'pointer',
-};
-
-const paginationStyle = {
+/* ========================= */
+/* 📄 PAGINATION */
+/* ========================= */
+export const paginationStyle = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
   marginTop: '2rem',
   padding: '1rem',
-  backgroundColor: 'white',
-  borderRadius: '8px',
+  backgroundColor: '#ffffff',
+  borderRadius: '10px',
+  boxShadow: '0 4px 10px rgba(0,0,0,0.08)',
 };
 
-const paginationButtonStyle = {
-  padding: '0.5rem 1rem',
+export const paginationButtonStyle = {
+  padding: '0.5rem 1.2rem',
   backgroundColor: '#007bff',
   color: 'white',
   border: 'none',
-  borderRadius: '5px',
+  borderRadius: '6px',
   cursor: 'pointer',
 };
 
-const pageInfoStyle = {
+export const pageInfoStyle = {
   fontSize: '0.9rem',
   color: '#555',
 };
 
-const errorStyle = {
+/* ========================= */
+/* ⚠️ STATES */
+/* ========================= */
+export const errorStyle = {
   padding: '1rem',
-  backgroundColor: '#f8d7da',
-  color: '#721c24',
-  borderRadius: '5px',
+  backgroundColor: '#fdecea',
+  color: '#b71c1c',
+  borderRadius: '6px',
   marginBottom: '1rem',
+  border: '1px solid #f5c6cb',
 };
 
-const emptyStateStyle = {
+export const emptyStateStyle = {
   textAlign: 'center',
   padding: '2rem',
-  backgroundColor: '#fff',
-  borderRadius: '10px',
+  backgroundColor: '#ffffff',
+  borderRadius: '12px',
+  boxShadow: '0 4px 10px rgba(0,0,0,0.05)',
 };
 
-const centerStyle = {
+export const centerStyle = {
   textAlign: 'center',
   marginTop: '2rem',
+  fontSize: '1rem',
+  color: '#666',
 };
+export default Dashboard;
