@@ -3,6 +3,7 @@ import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import socket from '../services/socket';
+import toast from 'react-hot-toast';
 
 const Dashboard = () => {
   const { user, logout, loading } = useAuth();
@@ -18,50 +19,59 @@ const Dashboard = () => {
   /* ========================= */
   /* 🔌 SOCKET CONNECTION */
   /* ========================= */
-  useEffect(() => {
-    if (!user) return;
+useEffect(() => {
+  if (!user) return;
 
-    socket.connect();
+  socket.auth = {
+    token: localStorage.getItem('token'),
+  };
 
-    socket.on('connect', () => {
-      console.log('🔌 Socket connected:', socket.id);
-    });
+  socket.connect();
 
-    socket.on('disconnect', (reason) => {
-      console.log('❌ Socket disconnected:', reason);
-    });
+  socket.on('connect', () => {
+    console.log('🔌 Socket connected:', socket.id);
+  });
 
-    socket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error.message);
-    });
+  socket.on('disconnect', (reason) => {
+    console.log('❌ Socket disconnected:', reason);
+  });
 
-    /* ✅ REAL-TIME EVENTS */
+  socket.on('connect_error', (error) => {
+    console.error('Socket connection error:', error.message);
+  });
 
-    // When a post is deleted (from any user)
-    socket.on('post_deleted', (postId) => {
-      setPosts((prev) => prev.filter((post) => post._id !== postId));
+  /* ✅ REAL-TIME EVENTS */
 
-      setPagination((prev) => ({
-        ...prev,
-        total: prev.total - 1,
-      }));
-    });
+  socket.on('newPost', (data) => {
+    toast.success(data.message);
+    setPosts((prev) => [data.post, ...prev]);
+  });
 
-    // When a new post is created
-    socket.on('post_created', (newPost) => {
-      setPosts((prev) => [newPost, ...prev]);
-    });
+  socket.on('post_deleted', (postId) => {
+    setPosts((prev) => prev.filter((post) => post._id !== postId));
 
-    return () => {
-      socket.off('connect');
-      socket.off('disconnect');
-      socket.off('connect_error');
-      socket.off('post_deleted');
-      socket.off('post_created');
-      socket.disconnect();
-    };
-  }, [user]);
+    setPagination((prev) => ({
+      ...prev,
+      total: Math.max(prev.total - 1, 0),
+    }));
+  });
 
+  socket.on('post_updated', (updatedPost) => {
+    setPosts((prev) =>
+      prev.map((p) => (p._id === updatedPost._id ? updatedPost : p))
+    );
+  });
+
+  return () => {
+    socket.off('connect');
+    socket.off('disconnect');
+    socket.off('connect_error');
+    socket.off('newPost');
+    socket.off('post_deleted');
+    socket.off('post_updated');
+    socket.disconnect();
+  };
+}, [user]);
   /* ========================= */
   /* 📡 FETCH POSTS */
   /* ========================= */
