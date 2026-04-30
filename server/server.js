@@ -1,28 +1,29 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import jwt from 'jsonwebtoken';
+
 import connectDB from './config/database.js';
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
-import postRoutes from './routes/postRoutes.js'; 
+import postRoutes from './routes/postRoutes.js';
 
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 
-
-// Load environment variables
 dotenv.config();
 
-// Connect to database
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET is missing');
+}
+
 connectDB();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Create HTTP server
 const httpServer = createServer(app);
 
-// Initialize Socket.IO
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.CLIENT_URL || 'http://localhost:5173',
@@ -30,51 +31,70 @@ const io = new Server(httpServer, {
   }
 });
 
-// Middleware
-// Middleware
-app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
-  credentials: true,
-  optionsSuccessStatus: 200
-}));
-
+/* 🔐 SOCKET AUTH */
 io.use((socket, next) => {
-  const origin = socket.handshake.headers.origin;
-  if (origin === process.env.CLIENT_URL || origin === 'http://localhost:5173') {
-    return next();
-  } else {
-    return next(new Error('CORS error: Origin not allowed'));
-  }   
+  try {
+    const token = socket.handshake.auth.token;
+
+    if (!token) {
+      return next(new Error('Authentication error: No token provided'));
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    socket.data.user = decoded;
+
+    next();
+  } catch (err) {
+    return next(new Error(`Authentication error: ${err.message}`));
+  }
 });
 
-// Socket.io connection handling
+/* 🔌 SOCKET CONNECTION */
 io.on('connection', (socket) => {
-  console.log(`✅ User connected: ${socket.id}`);
+  const userId = socket.data.user.id || socket.data.user._id;
 
-  // Handle disconnection
+  socket.join(userId);
+
+  console.log(
+    `✅ User connected: ${socket.id} | User: ${socket.data.user.email}`
+  );
+
   socket.on('disconnect', (reason) => {
     console.log(`❌ User disconnected: ${socket.id} (${reason})`);
   });
 });
 
+/* 🌐 EXPRESS */
+app.use(cors({
+  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  credentials: true
+}));
 
 app.use(express.json());
-// Routes
+
+/* ✅ Attach io globally */
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
+/* 🚀 ROUTES */
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
 
-// Health check endpoint (keep this for testing)
+/* ❤️ HEALTH */
 app.get('/api/health', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'Server is running!',
     timestamp: new Date(),
     database: 'Connected'
   });
 });
 
-// Start server
+/* 🚀 START */
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`🔌 Socket.io ready for connections`);
+  console.log(`🔌 Socket.io ready`);
 });

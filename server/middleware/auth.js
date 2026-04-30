@@ -1,43 +1,77 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
+// @desc    Protect routes (JWT Authentication)
+// @access  Private
 export const protect = async (req, res, next) => {
   try {
-    // Get token from header
     let token;
-    
-    if (req.headers.authorization && 
-        req.headers.authorization.startsWith('Bearer')) {
+
+    /* ========================= */
+    /* 🔑 GET TOKEN FROM HEADER */
+    /* ========================= */
+    if (
+      req.headers.authorization &&
+      req.headers.authorization.startsWith('Bearer')
+    ) {
       // Extract token from "Bearer <token>"
       token = req.headers.authorization.split(' ')[1];
     }
 
-    // Check if token exists
+    /* ========================= */
+    /* ❌ NO TOKEN */
+    /* ========================= */
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Not authorized, no token'
+        message: 'Not authorized, no token provided'
       });
     }
 
-    // Verify token
+    /* ========================= */
+    /* 🔐 VERIFY TOKEN */
+    /* ========================= */
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Get user from token (exclude password)
-    req.user = await User.findById(decoded.userId).select('-password');
+    /* ========================= */
+    /* 👤 FETCH USER FROM DB */
+    /* ========================= */
+    const user = await User.findById(decoded.userId).select('-password');
 
-    if (!req.user) {
+    if (!user) {
       return res.status(401).json({
         success: false,
         message: 'User not found'
       });
     }
 
-    // Continue to next middleware/route
+    /* ========================= */
+    /* 📦 ATTACH USER TO REQUEST */
+    /* ========================= */
+    req.user = user;
+
     next();
-    
+
   } catch (error) {
-    console.error('Auth middleware error:', error);
+    console.error('Auth middleware error:', error.message);
+
+    /* ========================= */
+    /* ❌ TOKEN ERROR HANDLING */
+    /* ========================= */
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token'
+      });
+    }
+
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Token expired'
+      });
+    }
+
     return res.status(401).json({
       success: false,
       message: 'Not authorized, token failed'
