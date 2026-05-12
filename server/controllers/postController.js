@@ -7,39 +7,39 @@ export const createPost = async (req, res) => {
   try {
     const { title, content, category, status } = req.body;
 
-    // Validate required fields
-    if (!title || !content) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide title and content'
-      });
-    }
-
-    // Create post with authenticated user as author
-    const post = await Post.create({
+    const newPost = new Post({
       title,
       content,
       category,
       status,
-      author: req.user._id // From protect middleware
+      author: req.user._id
+    });
+
+    const savedPost = await newPost.save();
+
+    /* 📡 EMIT EVENT (USER-SPECIFIC) */
+    req.io.to(req.user._id.toString()).emit('newPost', {
+      message: `New post created by ${req.user.name}`,
+      post: {
+        _id: savedPost._id,
+        title: savedPost.title,
+        createdBy: req.user.name
+      }
     });
 
     res.status(201).json({
       success: true,
-      message: 'Post created successfully',
-      data: post
+      data: savedPost
     });
 
   } catch (error) {
-    console.error('Create post error:', error);
+    console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Error creating post',
-      error: error.message
+      message: 'Server error while creating post'
     });
   }
 };
-
 // @desc    Get posts with pagination
 // @route   GET /api/posts?page=1&limit=10
 // @access  Private
@@ -94,7 +94,6 @@ export const deletePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
 
-    // Check if post exists
     if (!post) {
       return res.status(404).json({
         success: false,
@@ -102,16 +101,17 @@ export const deletePost = async (req, res) => {
       });
     }
 
-    // Check ownership - CRITICAL SECURITY CHECK
     if (post.author.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized to delete this post'
+        message: 'Not authorized'
       });
     }
 
-    // Delete the post
     await post.deleteOne();
+
+    /* 📡 EMIT DELETE EVENT */
+    req.io.to(req.user._id.toString()).emit('post_deleted', req.params.id);
 
     res.status(200).json({
       success: true,
@@ -120,11 +120,10 @@ export const deletePost = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete post error:', error);
+    console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Error deleting post',
-      error: error.message
+      message: 'Error deleting post'
     });
   }
 };
@@ -136,7 +135,6 @@ export const updatePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
 
-    // Check if post exists
     if (!post) {
       return res.status(404).json({
         success: false,
@@ -144,24 +142,30 @@ export const updatePost = async (req, res) => {
       });
     }
 
-    // Check ownership - CRITICAL SECURITY CHECK
     if (post.author.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized to update this post'
+        message: 'Not authorized'
       });
     }
 
-    // Update fields
     const { title, content, category, status } = req.body;
-    
+
     if (title) post.title = title;
     if (content) post.content = content;
     if (category) post.category = category;
     if (status) post.status = status;
 
-    // Save updated post
     const updatedPost = await post.save();
+
+    /* 📡 EMIT UPDATE EVENT */
+    req.io.to(req.user._id.toString()).emit('post_updated', {
+      _id: updatedPost._id,
+      title: updatedPost.title,
+      content: updatedPost.content,
+      category: updatedPost.category,
+      status: updatedPost.status
+    });
 
     res.status(200).json({
       success: true,
@@ -170,15 +174,13 @@ export const updatePost = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update post error:', error);
+    console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Error updating post',
-      error: error.message
+      message: 'Error updating post'
     });
   }
 };
-
 // @desc    Get single post by ID
 // @route   GET /api/posts/:id
 // @access  Private
