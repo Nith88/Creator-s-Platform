@@ -8,6 +8,7 @@ import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import postRoutes from './routes/postRoutes.js';
 import uploadRoutes from './routes/upload.js';
+import requestTimer from './middleware/requestTimer.js';
 
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -72,6 +73,7 @@ app.use(cors({
   credentials: true
 }));
 
+app.use(requestTimer);
 app.use(express.json());
 
 /* ✅ Attach io globally */
