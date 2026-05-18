@@ -7,50 +7,7 @@ export const createPost = async (req, res) => { try { const { title, content, ca
 // @desc    Get posts with pagination
 // @route   GET /api/posts?page=1&limit=10
 // @access  Private
-export const getPosts = async (req, res) => {
-  try {
-    // Get page and limit from query params (with defaults)
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    
-    // Calculate skip value
-    const skip = (page - 1) * limit;
-
-    // Get posts for logged-in user only
-    const posts = await Post.find({ author: req.user._id })
-      .sort({ createdAt: -1 }) // Newest first
-      .skip(skip)
-      .limit(limit)
-      .populate('author', 'name email'); // Include author info
-
-    // Get total count for pagination
-    const total = await Post.countDocuments({ author: req.user._id });
-
-    // Calculate total pages
-    const totalPages = Math.ceil(total / limit);
-
-    res.status(200).json({
-      success: true,
-      data: posts,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1
-      }
-    });
-
-  } catch (error) {
-    console.error('Get posts error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching posts',
-      error: error.message
-    });
-  }
-};
+export const getPosts = async (req, res) => { try { const page = parseInt(req.query.page) || 1; const limit = parseInt(req.query.limit) || 10; const skip = (page - 1) * limit; const query = { author: req.user._id }; const [posts, total] = await Promise.all([ Post.find(query) .select( 'title content category status coverImage createdAt author' ) .populate('author', 'name email') .sort({ createdAt: -1 }) .skip(skip) .limit(limit) .lean(), Post.countDocuments(query) ]); const totalPages = Math.ceil(total / limit); res.status(200).json({ success: true, data: posts, pagination: { page, limit, total, totalPages, hasNextPage: page < totalPages, hasPrevPage: page > 1 } }); } catch (error) { console.error(error); res.status(500).json({ success: false, message: 'Error fetching posts' }); } };
 // @desc    Delete post
 // @route   DELETE /api/posts/:id
 // @access  Private

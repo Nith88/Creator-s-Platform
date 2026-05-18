@@ -31,6 +31,7 @@ const userSchema = new mongoose.Schema(
     timestamps: true // Automatically creates createdAt and updatedAt fields
   }
 );
+userSchema.index({ email: 1 });
 
 const User = mongoose.model('User', userSchema);
 

@@ -28,12 +28,18 @@ const postSchema = new mongoose.Schema(
       type: String,
       enum: ['draft', 'published'],
       default: 'draft'
-    }
+    },
+    coverImage: {
+  type: String,
+  default: null
+}
   },
   { 
     timestamps: true // Adds createdAt and updatedAt
   }
 );
+
+/* ✅ SINGLE FIELD INDEXES */ postSchema.index({ author: 1 }); postSchema.index({ createdAt: -1 }); /* ✅ COMPOUND INDEXES */ postSchema.index({ author: 1, createdAt: -1 }); postSchema.index({ author: 1, status: 1 });
 
 const Post = mongoose.model('Post', postSchema);
 
