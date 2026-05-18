@@ -6,15 +6,19 @@ import api from '../services/api';
 import ImageUpload from '../components/ImageUpload';
 
 const CreatePost = () => {
+
+  /* 📝 FORM STATE */
   const [formData, setFormData] = useState({
     title: '',
     content: '',
     category: 'Technology',
     status: 'draft',
-    image: ''
+    coverImage: ''
   });
 
+  /* ⏳ STATES */
   const [isLoading, setIsLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
   const navigate = useNavigate();
@@ -30,15 +34,22 @@ const CreatePost = () => {
   /* 🖼️ HANDLE IMAGE UPLOAD */
   const handleUpload = async (uploadData) => {
     try {
+      setUploading(true);
+
       const imageUrl = uploadData.imageUrl;
 
       setFormData((prev) => ({
         ...prev,
-        image: imageUrl
+        coverImage: imageUrl
       }));
 
     } catch (err) {
       console.error('Upload handling failed:', err);
+
+      setError('Failed to upload image');
+
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -50,15 +61,31 @@ const CreatePost = () => {
     setIsLoading(true);
 
     try {
-      const response = await api.post('/api/posts', formData);
+      const response = await api.post(
+        '/api/posts',
+        formData
+      );
 
       if (response.data.success) {
+
+        /* ✅ RESET FORM */
+        setFormData({
+          title: '',
+          content: '',
+          category: 'Technology',
+          status: 'draft',
+          coverImage: ''
+        });
+
+        /* ✅ NAVIGATE */
         navigate('/dashboard');
       }
 
     } catch (err) {
+
       setError(
-        err.response?.data?.message || 'Failed to create post'
+        err.response?.data?.message ||
+        'Failed to create post'
       );
 
     } finally {
@@ -69,6 +96,7 @@ const CreatePost = () => {
   return (
     <div style={containerStyle}>
       <div style={formContainerStyle}>
+
         <h1>Create New Post</h1>
 
         {error && (
@@ -77,9 +105,12 @@ const CreatePost = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={formStyle}>
+        <form
+          onSubmit={handleSubmit}
+          style={formStyle}
+        >
 
-          {/* TITLE */}
+          {/* 📝 TITLE */}
           <div style={fieldStyle}>
             <label>Title</label>
 
@@ -94,7 +125,7 @@ const CreatePost = () => {
             />
           </div>
 
-          {/* CONTENT */}
+          {/* 📄 CONTENT */}
           <div style={fieldStyle}>
             <label>Content</label>
 
@@ -109,16 +140,20 @@ const CreatePost = () => {
             />
           </div>
 
-          {/* IMAGE UPLOAD */}
+          {/* 🖼️ IMAGE UPLOAD */}
           <div style={fieldStyle}>
             <label>Featured Image</label>
 
             <ImageUpload onUpload={handleUpload} />
 
-            {formData.image && (
+            {uploading && (
+              <p>Uploading image...</p>
+            )}
+
+            {formData.coverImage && (
               <img
-                src={formData.image}
-                alt="Uploaded"
+                src={formData.coverImage}
+                alt={`Cover preview for ${formData.title || 'new post'}`}
                 style={{
                   width: '100%',
                   maxHeight: '300px',
@@ -130,7 +165,7 @@ const CreatePost = () => {
             )}
           </div>
 
-          {/* CATEGORY */}
+          {/* 🏷️ CATEGORY */}
           <div style={fieldStyle}>
             <label>Category</label>
 
@@ -140,14 +175,25 @@ const CreatePost = () => {
               onChange={handleChange}
               style={inputStyle}
             >
-              <option value="Technology">Technology</option>
-              <option value="Lifestyle">Lifestyle</option>
-              <option value="Travel">Travel</option>
-              <option value="Food">Food</option>
+              <option value="Technology">
+                Technology
+              </option>
+
+              <option value="Lifestyle">
+                Lifestyle
+              </option>
+
+              <option value="Travel">
+                Travel
+              </option>
+
+              <option value="Food">
+                Food
+              </option>
             </select>
           </div>
 
-          {/* STATUS */}
+          {/* 📢 STATUS */}
           <div style={fieldStyle}>
             <label>Status</label>
 
@@ -157,19 +203,33 @@ const CreatePost = () => {
               onChange={handleChange}
               style={inputStyle}
             >
-              <option value="draft">Draft</option>
-              <option value="published">Published</option>
+              <option value="draft">
+                Draft
+              </option>
+
+              <option value="published">
+                Published
+              </option>
             </select>
           </div>
 
-          {/* SUBMIT BUTTON */}
+          {/* 🚀 SUBMIT BUTTON */}
           <button
             type="submit"
-            disabled={isLoading}
-            style={buttonStyle}
+            disabled={isLoading || uploading}
+            style={{
+              ...buttonStyle,
+              opacity:
+                isLoading || uploading ? 0.7 : 1
+            }}
           >
-            {isLoading ? 'Creating...' : 'Create Post'}
+            {uploading
+              ? 'Uploading Image...'
+              : isLoading
+              ? 'Creating...'
+              : 'Create Post'}
           </button>
+
         </form>
       </div>
     </div>

@@ -3,43 +3,7 @@ import Post from '../models/Post.js';
 // @desc    Create new post
 // @route   POST /api/posts
 // @access  Private
-export const createPost = async (req, res) => {
-  try {
-    const { title, content, category, status } = req.body;
-
-    const newPost = new Post({
-      title,
-      content,
-      category,
-      status,
-      author: req.user._id
-    });
-
-    const savedPost = await newPost.save();
-
-    /* 📡 EMIT EVENT (USER-SPECIFIC) */
-    req.io.to(req.user._id.toString()).emit('newPost', {
-      message: `New post created by ${req.user.name}`,
-      post: {
-        _id: savedPost._id,
-        title: savedPost.title,
-        createdBy: req.user.name
-      }
-    });
-
-    res.status(201).json({
-      success: true,
-      data: savedPost
-    });
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while creating post'
-    });
-  }
-};
+export const createPost = async (req, res) => { try { const { title, content, category, status, coverImage } = req.body; const newPost = new Post({ title, content, category, status, coverImage, author: req.user._id }); const savedPost = await newPost.save(); /* 📡 EMIT EVENT */ req.io.to(req.user._id.toString()).emit('newPost', { message: `New post created by ${req.user.name}`, post: { _id: savedPost._id, title: savedPost.title, coverImage: savedPost.coverImage, createdBy: req.user.name } }); res.status(201).json({ success: true, data: savedPost }); } catch (error) { console.error(error); res.status(500).json({ success: false, message: 'Server error while creating post' }); } };
 // @desc    Get posts with pagination
 // @route   GET /api/posts?page=1&limit=10
 // @access  Private
