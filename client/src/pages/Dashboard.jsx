@@ -1,111 +1,181 @@
+
 import { useEffect, useState } from 'react';
 import { useNavigate, Navigate, Link } from 'react-router-dom';
+
 import { useAuth } from '../context/AuthContext';
+
 import api from '../services/api';
 import socket from '../services/socket';
+
 import toast from 'react-hot-toast';
 
 const Dashboard = () => {
+
   const { user, logout, loading } = useAuth();
+
   const navigate = useNavigate();
+
+  /* ========================= */
+  /* 📦 STATE */
+  /* ========================= */
 
   const [posts, setPosts] = useState([]);
   const [pagination, setPagination] = useState({});
+
   const [currentPage, setCurrentPage] = useState(1);
+
   const [isLoading, setIsLoading] = useState(true);
+
   const [error, setError] = useState('');
+
   const [hoveredId, setHoveredId] = useState(null);
 
   /* ========================= */
   /* 🔌 SOCKET CONNECTION */
   /* ========================= */
-useEffect(() => {
-  if (!user) return;
 
-  socket.auth = {
-    token: localStorage.getItem('token'),
-  };
+  useEffect(() => {
 
-  socket.connect();
+    if (!user) return;
 
-  socket.on('connect', () => {
-    console.log('🔌 Socket connected:', socket.id);
-  });
+    socket.auth = {
+      token: localStorage.getItem('token'),
+    };
 
-  socket.on('disconnect', (reason) => {
-    console.log('❌ Socket disconnected:', reason);
-  });
+    socket.connect();
 
-  socket.on('connect_error', (error) => {
-    console.error('Socket connection error:', error.message);
-  });
+    socket.on('connect', () => {
+      console.log('🔌 Socket connected:', socket.id);
+    });
 
-  /* ✅ REAL-TIME EVENTS */
+    socket.on('disconnect', (reason) => {
+      console.log('❌ Socket disconnected:', reason);
+    });
 
-  socket.on('newPost', (data) => {
-    toast.success(data.message);
-    setPosts((prev) => [data.post, ...prev]);
-  });
+    socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error.message);
+    });
 
-  socket.on('post_deleted', (postId) => {
-    setPosts((prev) => prev.filter((post) => post._id !== postId));
+    /* ✅ NEW POST */
 
-    setPagination((prev) => ({
-      ...prev,
-      total: Math.max(prev.total - 1, 0),
-    }));
-  });
+    socket.on('newPost', (data) => {
 
-  socket.on('post_updated', (updatedPost) => {
-    setPosts((prev) =>
-      prev.map((p) => (p._id === updatedPost._id ? updatedPost : p))
-    );
-  });
+      toast.success(data.message);
 
-  return () => {
-    socket.off('connect');
-    socket.off('disconnect');
-    socket.off('connect_error');
-    socket.off('newPost');
-    socket.off('post_deleted');
-    socket.off('post_updated');
-    socket.disconnect();
-  };
-}, [user]);
+      setPosts((prev) => [data.post, ...prev]);
+
+      setPagination((prev) => ({
+        ...prev,
+        total: (prev.total || 0) + 1,
+      }));
+    });
+
+    /* ✅ DELETE POST */
+
+    socket.on('post_deleted', (postId) => {
+
+      setPosts((prev) =>
+        prev.filter((post) => post._id !== postId)
+      );
+
+      setPagination((prev) => ({
+        ...prev,
+        total: Math.max((prev.total || 1) - 1, 0),
+      }));
+    });
+
+    /* ✅ UPDATE POST */
+
+    socket.on('post_updated', (updatedPost) => {
+
+      setPosts((prev) =>
+        prev.map((post) =>
+          post._id === updatedPost._id
+            ? updatedPost
+            : post
+        )
+      );
+    });
+
+    return () => {
+
+      socket.off('connect');
+      socket.off('disconnect');
+
+      socket.off('connect_error');
+
+      socket.off('newPost');
+      socket.off('post_deleted');
+      socket.off('post_updated');
+
+      socket.disconnect();
+    };
+
+  }, [user]);
+
   /* ========================= */
   /* 📡 FETCH POSTS */
   /* ========================= */
+
   useEffect(() => {
     fetchPosts(currentPage);
   }, [currentPage]);
 
   const fetchPosts = async (page) => {
+
     setIsLoading(true);
+
     setError('');
 
     try {
-      const response = await api.get(`/api/posts?page=${page}&limit=10`);
+
+      const response = await api.get(
+        `/api/posts?page=${page}&limit=10`
+      );
+
       setPosts(response.data.data);
+
       setPagination(response.data.pagination);
+
     } catch (err) {
-      setError('Failed to load posts');
+
       console.error(err);
+
+      setError('Failed to load posts');
+
     } finally {
+
       setIsLoading(false);
     }
   };
+
+  /* ========================= */
+  /* 📄 PAGINATION */
+  /* ========================= */
 
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
   };
 
+  /* ========================= */
+  /* 🚪 LOGOUT */
+  /* ========================= */
+
   const handleLogout = () => {
-    socket.disconnect(); // ✅ ensure socket closes on logout
+
+    socket.disconnect();
+
     logout();
+
     navigate('/login');
   };
 
+  /* ========================= */
+  /* 🗑️ DELETE POST */
+  /* ========================= */
+
   const handleDelete = async (postId) => {
+
     const confirmed = window.confirm(
       'Are you sure you want to delete this post?'
     );
@@ -113,127 +183,265 @@ useEffect(() => {
     if (!confirmed) return;
 
     try {
-      const response = await api.delete(`/api/posts/${postId}`);
+
+      const response = await api.delete(
+        `/api/posts/${postId}`
+      );
 
       if (response.data.success) {
-        // Local update (instant UI)
-        setPosts(posts.filter((post) => post._id !== postId));
+
+        /* ✅ INSTANT UI UPDATE */
+
+        setPosts((prev) =>
+          prev.filter((post) => post._id !== postId)
+        );
 
         setPagination((prev) => ({
           ...prev,
-          total: prev.total - 1,
+          total: Math.max((prev.total || 1) - 1, 0),
         }));
 
-        // Emit event to others
-        socket.emit('delete_post', postId);
-
-        alert('Post deleted successfully');
+        toast.success('Post deleted successfully');
       }
+
     } catch (error) {
+
       console.error(error);
-      alert(error.response?.data?.message || 'Delete failed');
+
+      toast.error(
+        error.response?.data?.message ||
+        'Delete failed'
+      );
     }
   };
 
-  if (loading) return <div style={centerStyle}>Loading...</div>;
-  if (!user) return <Navigate to="/login" />;
+  /* ========================= */
+  /* ⏳ AUTH LOADING */
+  /* ========================= */
+
+  if (loading) {
+    return (
+      <div style={centerStyle}>
+        Loading...
+      </div>
+    );
+  }
+
+  /* ========================= */
+  /* 🔒 AUTH CHECK */
+  /* ========================= */
+
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  /* ========================= */
+  /* 🎨 UI */
+  /* ========================= */
 
   return (
     <div style={containerStyle}>
+
+      {/* 🔝 HEADER */}
+
       <div style={headerStyle}>
-        <h2>Welcome, {user.name} 👋</h2>
+
+        <h2>
+          Welcome, {user.name} 👋
+        </h2>
 
         <div style={{ display: 'flex', gap: '10px' }}>
+
           <Link to="/create">
-            <button style={createButtonStyle}>+ Create</button>
+            <button style={createButtonStyle}>
+              + Create
+            </button>
           </Link>
 
-          <button onClick={handleLogout} style={logoutButtonStyle}>
+          <button
+            onClick={handleLogout}
+            style={logoutButtonStyle}
+          >
             Logout
           </button>
+
         </div>
       </div>
 
-      {error && <div style={errorStyle}>{error}</div>}
+      {/* ⚠️ ERROR */}
+
+      {error && (
+        <div style={errorStyle}>
+          {error}
+        </div>
+      )}
+
+      {/* ⏳ LOADING */}
 
       {isLoading ? (
-        <div style={centerStyle}>Loading posts...</div>
+
+        <div style={centerStyle}>
+          Loading posts...
+        </div>
+
       ) : (
+
         <div style={postsContainerStyle}>
+
+          {/* 📭 EMPTY STATE */}
+
           {posts.length === 0 ? (
+
             <div style={emptyStateStyle}>
+
               <p>No posts yet</p>
-              <Link to="/create">Create your first post</Link>
+
+              <Link to="/create">
+                Create your first post
+              </Link>
+
             </div>
+
           ) : (
+
             <>
               {posts.map((post) => (
+
                 <div
                   key={post._id}
                   style={{
                     ...postCardStyle,
                     transform:
-                      hoveredId === post._id ? 'scale(1.02)' : 'scale(1)',
+                      hoveredId === post._id
+                        ? 'scale(1.02)'
+                        : 'scale(1)',
                   }}
-                  onMouseEnter={() => setHoveredId(post._id)}
-                  onMouseLeave={() => setHoveredId(null)}
+                  onMouseEnter={() =>
+                    setHoveredId(post._id)
+                  }
+                  onMouseLeave={() =>
+                    setHoveredId(null)
+                  }
                 >
+
+                  {/* 📝 TITLE */}
+
                   <h3>{post.title}</h3>
 
+                  {/* 🖼️ COVER IMAGE */}
+
+                  {post.coverImage && (
+
+                    <img
+                      src={post.coverImage}
+                      alt={`Cover image for ${post.title}`}
+                      style={{
+                        width: '100%',
+                        height: '220px',
+                        objectFit: 'cover',
+                        borderRadius: '10px',
+                        marginTop: '1rem',
+                        marginBottom: '1rem',
+                      }}
+                    />
+                  )}
+
+                  {/* 📄 CONTENT */}
+
                   <p style={contentPreviewStyle}>
-                    {post.content.substring(0, 150)}...
+
+                    {post.content?.length > 150
+                      ? `${post.content.substring(0, 150)}...`
+                      : post.content}
+
                   </p>
 
+                  {/* 🏷️ META */}
+
                   <div style={metaStyle}>
+
                     <span>{post.category}</span>
+
                     <span>{post.status}</span>
+
                     <span>
-                      {new Date(post.createdAt).toLocaleDateString()}
+                      {new Date(
+                        post.createdAt
+                      ).toLocaleDateString()}
                     </span>
+
                   </div>
 
+                  {/* ⚙️ ACTIONS */}
+
                   <div style={actionsStyle}>
+
                     <Link to={`/edit/${post._id}`}>
-                      <button style={editButtonStyle}>Edit</button>
+
+                      <button style={editButtonStyle}>
+                        Edit
+                      </button>
+
                     </Link>
 
                     <button
-                      onClick={() => handleDelete(post._id)}
+                      onClick={() =>
+                        handleDelete(post._id)
+                      }
                       style={deleteButtonStyle}
                     >
                       Delete
                     </button>
+
                   </div>
+
                 </div>
               ))}
 
+              {/* 📄 PAGINATION */}
+
               <div style={paginationStyle}>
+
                 <button
-                  onClick={() => handlePageChange(currentPage - 1)}
+                  onClick={() =>
+                    handlePageChange(currentPage - 1)
+                  }
                   disabled={!pagination.hasPrevPage}
                   style={{
                     ...paginationButtonStyle,
-                    opacity: !pagination.hasPrevPage ? 0.5 : 1,
+                    opacity:
+                      !pagination.hasPrevPage
+                        ? 0.5
+                        : 1,
                   }}
                 >
                   Previous
                 </button>
 
                 <span style={pageInfoStyle}>
-                  Page {pagination.page} of {pagination.totalPages} (
+
+                  Page {pagination.page} of{' '}
+                  {pagination.totalPages} (
                   {pagination.total} posts)
+
                 </span>
 
                 <button
-                  onClick={() => handlePageChange(currentPage + 1)}
+                  onClick={() =>
+                    handlePageChange(currentPage + 1)
+                  }
                   disabled={!pagination.hasNextPage}
                   style={{
                     ...paginationButtonStyle,
-                    opacity: !pagination.hasNextPage ? 0.5 : 1,
+                    opacity:
+                      !pagination.hasNextPage
+                        ? 0.5
+                        : 1,
                   }}
                 >
                   Next
                 </button>
+
               </div>
             </>
           )}
@@ -242,21 +450,25 @@ useEffect(() => {
     </div>
   );
 };
+
 /* ========================= */
 /* 🌐 CONTAINER */
 /* ========================= */
+
 export const containerStyle = {
   minHeight: '100vh',
   padding: '2rem',
   maxWidth: '1100px',
   margin: '0 auto',
-  background: 'linear-gradient(to right, #eef2f3, #ffffff)',
+  background:
+    'linear-gradient(to right, #eef2f3, #ffffff)',
   fontFamily: 'Segoe UI, sans-serif',
 };
 
 /* ========================= */
 /* 🔝 HEADER */
 /* ========================= */
+
 export const headerStyle = {
   display: 'flex',
   justifyContent: 'space-between',
@@ -271,6 +483,7 @@ export const headerStyle = {
 /* ========================= */
 /* 🔘 BUTTONS */
 /* ========================= */
+
 export const createButtonStyle = {
   padding: '0.5rem 1.2rem',
   backgroundColor: '#28a745',
@@ -279,7 +492,6 @@ export const createButtonStyle = {
   borderRadius: '6px',
   cursor: 'pointer',
   fontWeight: '500',
-  transition: '0.2s',
 };
 
 export const logoutButtonStyle = {
@@ -290,7 +502,6 @@ export const logoutButtonStyle = {
   borderRadius: '6px',
   cursor: 'pointer',
   fontWeight: '500',
-  transition: '0.2s',
 };
 
 export const editButtonStyle = {
@@ -316,6 +527,7 @@ export const deleteButtonStyle = {
 /* ========================= */
 /* 📦 POSTS */
 /* ========================= */
+
 export const postsContainerStyle = {
   display: 'flex',
   flexDirection: 'column',
@@ -334,6 +546,7 @@ export const postCardStyle = {
 /* ========================= */
 /* 📝 TEXT */
 /* ========================= */
+
 export const contentPreviewStyle = {
   color: '#555',
   margin: '1rem 0',
@@ -351,6 +564,7 @@ export const metaStyle = {
 /* ========================= */
 /* ⚙️ ACTIONS */
 /* ========================= */
+
 export const actionsStyle = {
   marginTop: '1rem',
   display: 'flex',
@@ -361,6 +575,7 @@ export const actionsStyle = {
 /* ========================= */
 /* 📄 PAGINATION */
 /* ========================= */
+
 export const paginationStyle = {
   display: 'flex',
   justifyContent: 'space-between',
@@ -389,6 +604,7 @@ export const pageInfoStyle = {
 /* ========================= */
 /* ⚠️ STATES */
 /* ========================= */
+
 export const errorStyle = {
   padding: '1rem',
   backgroundColor: '#fdecea',
@@ -412,4 +628,5 @@ export const centerStyle = {
   fontSize: '1rem',
   color: '#666',
 };
+
 export default Dashboard;
