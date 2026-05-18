@@ -1,19 +1,25 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
 import api from '../services/api';
+import ImageUpload from '../components/ImageUpload';
 
 const CreatePost = () => {
   const [formData, setFormData] = useState({
     title: '',
     content: '',
     category: 'Technology',
-    status: 'draft'
+    status: 'draft',
+    image: ''
   });
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
   const navigate = useNavigate();
 
+  /* ✏️ HANDLE INPUT CHANGES */
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -21,20 +27,40 @@ const CreatePost = () => {
     });
   };
 
+  /* 🖼️ HANDLE IMAGE UPLOAD */
+  const handleUpload = async (uploadData) => {
+    try {
+      const imageUrl = uploadData.imageUrl;
+
+      setFormData((prev) => ({
+        ...prev,
+        image: imageUrl
+      }));
+
+    } catch (err) {
+      console.error('Upload handling failed:', err);
+    }
+  };
+
+  /* 🚀 SUBMIT POST */
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setError('');
     setIsLoading(true);
 
     try {
       const response = await api.post('/api/posts', formData);
-      
+
       if (response.data.success) {
-        // Redirect to dashboard after successful creation
         navigate('/dashboard');
       }
+
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to create post');
+      setError(
+        err.response?.data?.message || 'Failed to create post'
+      );
+
     } finally {
       setIsLoading(false);
     }
@@ -44,13 +70,19 @@ const CreatePost = () => {
     <div style={containerStyle}>
       <div style={formContainerStyle}>
         <h1>Create New Post</h1>
-        
-        {error && <div style={errorStyle}>{error}</div>}
+
+        {error && (
+          <div style={errorStyle}>
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} style={formStyle}>
-          {/* Title */}
+
+          {/* TITLE */}
           <div style={fieldStyle}>
             <label>Title</label>
+
             <input
               type="text"
               name="title"
@@ -62,9 +94,10 @@ const CreatePost = () => {
             />
           </div>
 
-          {/* Content */}
+          {/* CONTENT */}
           <div style={fieldStyle}>
             <label>Content</label>
+
             <textarea
               name="content"
               value={formData.content}
@@ -76,9 +109,31 @@ const CreatePost = () => {
             />
           </div>
 
-          {/* Category */}
+          {/* IMAGE UPLOAD */}
+          <div style={fieldStyle}>
+            <label>Featured Image</label>
+
+            <ImageUpload onUpload={handleUpload} />
+
+            {formData.image && (
+              <img
+                src={formData.image}
+                alt="Uploaded"
+                style={{
+                  width: '100%',
+                  maxHeight: '300px',
+                  objectFit: 'cover',
+                  marginTop: '1rem',
+                  borderRadius: '8px'
+                }}
+              />
+            )}
+          </div>
+
+          {/* CATEGORY */}
           <div style={fieldStyle}>
             <label>Category</label>
+
             <select
               name="category"
               value={formData.category}
@@ -92,9 +147,10 @@ const CreatePost = () => {
             </select>
           </div>
 
-          {/* Status */}
+          {/* STATUS */}
           <div style={fieldStyle}>
             <label>Status</label>
+
             <select
               name="status"
               value={formData.status}
@@ -106,8 +162,9 @@ const CreatePost = () => {
             </select>
           </div>
 
-          <button 
-            type="submit" 
+          {/* SUBMIT BUTTON */}
+          <button
+            type="submit"
             disabled={isLoading}
             style={buttonStyle}
           >
@@ -119,59 +176,63 @@ const CreatePost = () => {
   );
 };
 
-// Add styles...
+/* 🎨 STYLES */
+
 const containerStyle = {
   display: 'flex',
-  justifyContent: 'center', 
-    padding: '2rem',
+  justifyContent: 'center',
+  padding: '2rem',
 };
-const formContainerStyle = {
-    width: '100%',
-    maxWidth: '600px',
-    backgroundColor: 'white',
-    padding: '2rem',
-    borderRadius: '8px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-};
-const formStyle = {
-    display: 'flex',
 
-    flexDirection: 'column',
-    gap: '1.5rem',
+const formContainerStyle = {
+  width: '100%',
+  maxWidth: '600px',
+  backgroundColor: 'white',
+  padding: '2rem',
+  borderRadius: '8px',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+};
+
+const formStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1.5rem',
 };
 
 const fieldStyle = {
-    display: 'flex',
-    flexDirection: 'column',
+  display: 'flex',
+  flexDirection: 'column',
 };
-const inputStyle = {
-    padding: '0.5rem',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-};
-const textareaStyle = {
-    padding: '0.5rem',
-    border: '1px solid #ccc',
 
-    borderRadius: '4px',
-    resize: 'vertical',
+const inputStyle = {
+  padding: '0.5rem',
+  border: '1px solid #ccc',
+  borderRadius: '4px',
+};
+
+const textareaStyle = {
+  padding: '0.5rem',
+  border: '1px solid #ccc',
+  borderRadius: '4px',
+  resize: 'vertical',
 };
 
 const buttonStyle = {
-    padding: '0.75rem',
-    backgroundColor: '#007bff',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-};
-const errorStyle = {
-    padding: '0.75rem',
-    backgroundColor: '#f8d7da', 
-    color: '#721c24',
-    border: '1px solid #f5c6cb',
-    borderRadius: '4px',
+  padding: '0.75rem',
+  backgroundColor: '#007bff',
+  color: 'white',
+  border: 'none',
+  borderRadius: '4px',
+  cursor: 'pointer',
 };
 
+const errorStyle = {
+  padding: '0.75rem',
+  backgroundColor: '#f8d7da',
+  color: '#721c24',
+  border: '1px solid #f5c6cb',
+  borderRadius: '4px',
+};
 
 export default CreatePost;
+
